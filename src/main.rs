@@ -11,10 +11,11 @@ fn main() -> Result<()> {
                 println!("Accepted new connection from {}", stream.peer_addr().unwrap().to_string());
                 let mut buffer = [0u8; 1024];
                 stream.read(&mut buffer)?;
-                
+                let _request_size = i32::from_be_bytes(buffer[..4].try_into()?);
+                let correlation_id = i32::from_be_bytes(buffer[8..12].try_into()?);
+
                 let mut response = vec![];
                 let response_size = 0i32;
-                let correlation_id = 7i32;
                 response.extend(response_size.to_be_bytes());
                 response.extend(correlation_id.to_be_bytes());
                 stream.write_all(&response)?;
