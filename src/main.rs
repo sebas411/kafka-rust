@@ -24,7 +24,8 @@ impl ApiVersion {
 
 fn generate_api_versions() -> HashMap<i16, ApiVersion> {
     let mut versions = HashMap::new();
-    versions.insert(18, ApiVersion::new(18, 0, 4)); //ApiVersions
+    versions.insert(18, ApiVersion::new(18, 0, 4)); // ApiVersions
+    versions.insert(75, ApiVersion::new(75, 0, 0)); // DescribeTopicPartitions
     versions
 }
 
@@ -56,8 +57,8 @@ async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiVersi
                     response_body.extend(((apiversions.len() + 1) as i8).to_be_bytes());
                     for (_, api_version) in &apiversions {
                         response_body.extend(api_version.encode());
+                        response_body.push(0); // tag
                     }
-                    response_body.push(0); // tag
                     response_body.extend(0i32.to_be_bytes()); // throttle time
                     response_body.push(0); // tag
                 },
