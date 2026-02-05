@@ -1,4 +1,4 @@
-use std::{io::{Read, Write}, net::TcpListener};
+use std::{collections::HashMap, io::{Read, Write}, net::TcpListener};
 use anyhow::Result;
 
 struct ApiVersion {
@@ -20,9 +20,9 @@ impl ApiVersion {
     }
 }
 
-fn generate_api_versions() -> Vec<ApiVersion> {
-    let mut versions = vec![];
-    versions.push(ApiVersion::new(18, 0, 4)); //ApiVersions
+fn generate_api_versions() -> HashMap<i16, ApiVersion> {
+    let mut versions = HashMap::new();
+    versions.insert(18, ApiVersion::new(18, 0, 4)); //ApiVersions
     versions
 }
 
@@ -45,25 +45,30 @@ fn main() -> Result<()> {
 
                 let mut response = vec![];
                 let mut response_body = vec![];
-                match request_api_key {
-                    18 =>  {
-                        let error_code: i16;
-                        if request_api_version > 4 || request_api_version < 0 {
-                            error_code = 35;
-                        } else {
-                            error_code = 0;
-                        }
-                        response_body.extend(error_code.to_be_bytes());
-                        response_body.extend(((apiversions.len() + 1) as i8).to_be_bytes());
-                        for api_version in &apiversions {
-                            response_body.extend(api_version.encode());
-                        }
-                        response_body.push(0); // tag
-                        response_body.extend(0i32.to_be_bytes()); // throttle time
-                        response_body.push(0); // tag
-                    },
-                    _ => ()
+
+                let error_code: i16;
+                if let Some(api_version) = apiversions.get(&request_api_key) && request_api_version >= api_version.min_version && request_api_version <= api_version.max_version {
+                    error_code = 0
+                } else {
+                    error_code = 35
                 }
+
+                response_body.extend(error_code.to_be_bytes());
+                if error_code == 0 {
+                    match request_api_key {
+                        18 =>  {
+                            response_body.extend(((apiversions.len() + 1) as i8).to_be_bytes());
+                            for (_, api_version) in &apiversions {
+                                response_body.extend(api_version.encode());
+                            }
+                            response_body.push(0); // tag
+                            response_body.extend(0i32.to_be_bytes()); // throttle time
+                            response_body.push(0); // tag
+                        },
+                        _ => ()
+                    }
+                }
+
                 let response_size = 4 + response_body.len() as i32;
                 response.extend(response_size.to_be_bytes());
                 response.extend(correlation_id.to_be_bytes());
