@@ -4,7 +4,7 @@ use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 
 use crate::{ApiVersion, modules::value::{Topic, compact_array_encode}};
 
-pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiVersion>) -> Result<()> {
+pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiVersion>, topics: Vec<Topic>) -> Result<()> {
     println!("Accepted new connection from {}", stream.peer_addr().unwrap().to_string());
     let mut buffer = [0u8; 10*1024]; // 10KiB buffer for request
 
@@ -50,17 +50,31 @@ pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiV
                     let throttle_time = 0i32;
                     let topics_requested = buffer[cursor] as usize - 1;
                     cursor += 1;
-                    let mut topics = vec![];
+                    let mut req_topics = vec![];
                     for _ in 0..topics_requested {
                         let topic_name_length = buffer[cursor] as usize - 1;
                         let topic_name = String::from_utf8(buffer[cursor + 1 .. cursor + 1 + topic_name_length].to_vec())?;
-                        let topic = Topic::new(3, &topic_name, [0u8; 16], false, vec![], 0);
-                        topics.push(topic);
+                        req_topics.push(topic_name);
                         cursor += 1 + topic_name_length + 1; // name_length + name + empty tag buffer
                     }
 
+                    let mut response_topics = vec![];
+                    for topic_req in req_topics {
+                        let mut found = false;
+                        for topic in &topics {
+                            if topic.get_name() == topic_req {
+                                found = true;
+                                response_topics.push(topic.clone());
+                                break;
+                            }
+                        }
+                        if !found {
+                            response_topics.push(Topic::new(3, &topic_req, [0u8; 16], false, vec![], 0));
+                        }
+                    }
+
                     response_body.extend(throttle_time.to_be_bytes()); // throttle time
-                    response_body.extend(compact_array_encode(&topics));
+                    response_body.extend(compact_array_encode(&response_topics));
                     response_body.extend((-1i8).to_be_bytes()); // null next cursor
                     response_body.push(0); // tags
                 },

@@ -2,6 +2,7 @@ pub trait Encode {
     fn encode(&self) -> Vec<u8>;
 }
 
+#[derive(Debug, Clone)]
 pub struct Topic {
     error_code: i16,
     name: String,
@@ -14,6 +15,12 @@ pub struct Topic {
 impl Topic {
     pub fn new(error_code: i16, name: &str, id: [u8;16], is_internal: bool, partitions: Vec<Partition>, authorized_operations: i32) -> Self {
         Self { error_code, name: name.to_string(), id, is_internal, partitions, authorized_operations }
+    }
+    pub fn add_partition(&mut self, partition: Partition) {
+        self.partitions.push(partition);
+    }
+    pub fn get_name(&self) -> String {
+        self.name.clone()
     }
 }
 
@@ -31,11 +38,39 @@ impl Encode for Topic {
     }
 }
 
-pub struct Partition;
+#[derive(Debug, Clone)]
+pub struct Partition {
+    error_code: i16,
+    index: u32,
+    leader_id: u32,
+    leader_epoch: u32,
+    replica_nodes: Vec<u32>,
+    isr_nodes: Vec<u32>,
+    eligible_leader_replicas: Vec<u32>,
+    last_known_elr: Vec<u32>,
+    offline_replicas: Vec<u32>,
+}
 
 impl Encode for Partition {
     fn encode(&self) -> Vec<u8> {
-        vec![]
+        let mut content = vec![];
+        content.extend(self.error_code.to_be_bytes());
+        content.extend(self.index.to_be_bytes());
+        content.extend(self.leader_id.to_be_bytes());
+        content.extend(self.leader_epoch.to_be_bytes());
+        content.extend(compact_array_encode(&self.replica_nodes));
+        content.extend(compact_array_encode(&self.isr_nodes));
+        content.extend(compact_array_encode(&self.eligible_leader_replicas));
+        content.extend(compact_array_encode(&self.last_known_elr));
+        content.extend(compact_array_encode(&self.offline_replicas));
+        content.push(0);
+        content
+    }
+}
+
+impl Partition {
+    pub fn new(error_code: i16, index: u32, leader_id: u32, leader_epoch: u32, replica_nodes: Vec<u32>, isr_nodes: Vec<u32>, eligible_leader_replicas: Vec<u32>, last_known_elr: Vec<u32>, offline_replicas: Vec<u32>) -> Self {
+        Self { error_code, index, leader_id, leader_epoch, replica_nodes, isr_nodes, eligible_leader_replicas, last_known_elr, offline_replicas }
     }
 }
 
@@ -64,5 +99,11 @@ pub fn compact_array_encode<T: Encode>(array: &Vec<T>) -> Vec<u8> {
         content.extend(element.encode());
     }
     content
+}
+
+impl Encode for u32 {
+    fn encode(&self) -> Vec<u8> {
+        self.to_be_bytes().to_vec()
+    }
 }
 

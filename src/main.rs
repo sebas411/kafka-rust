@@ -2,7 +2,7 @@ use std::{collections::HashMap};
 use anyhow::Result;
 use tokio::net::TcpListener;
 
-use crate::modules::client_handler::handle_client;
+use crate::modules::{client_handler::handle_client, parser::parse_topic_file};
 mod modules;
 
 #[derive(Debug, Clone)]
@@ -38,12 +38,15 @@ async fn main() -> Result<()> {
     println!("Listening on {}", listener.local_addr().unwrap().to_string());
     let apiversions = generate_api_versions();
 
+    let topics = parse_topic_file("/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log")?;
+
     let mut handles = vec![];
     loop {
         let (stream, _) = listener.accept().await?;
         let apiversions = apiversions.clone();
+        let topics = topics.clone();
         handles.push(tokio::spawn(async move {
-            match handle_client(stream, apiversions).await {
+            match handle_client(stream, apiversions, topics).await {
                 Ok(_) => (),
                 Err(e) => {
                     eprintln!("{}", e);
