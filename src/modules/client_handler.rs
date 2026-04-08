@@ -57,6 +57,7 @@ pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiV
                         req_topics.push(topic_name);
                         cursor += 1 + topic_name_length + 1; // name_length + name + empty tag buffer
                     }
+                    req_topics.sort();
 
                     let mut response_topics = vec![];
                     for topic_req in req_topics {
