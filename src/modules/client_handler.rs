@@ -28,7 +28,15 @@ pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiV
     
         if error_code == 0 {
             match request_api_key {
-                18 =>  { // ApiVersions
+                1  => { // Fetch
+                    response_version = 1;
+                    response_body.extend(0i32.to_be_bytes());
+                    response_body.extend(error_code.to_be_bytes());
+                    response_body.extend(0i32.to_be_bytes());
+                    response_body.push(1);
+                    response_body.push(0); // tag buffer
+                }
+                18 => { // ApiVersions
                     response_body.extend(error_code.to_be_bytes());
                     // array length
                     response_body.extend(((apiversions.len() + 1) as i8).to_be_bytes());
