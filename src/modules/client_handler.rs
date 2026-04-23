@@ -45,19 +45,23 @@ pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiV
                     for _ in 0..topics_length {
                         let topic_id: [u8; 16] = buffer[cursor..cursor+16].try_into()?;
                         
+                        let mut response = FetchResponse::new(topic_id);
                         let mut found_topic = false;
                         for topic in &topics {
                             if topic.get_id() == topic_id {
                                 found_topic = true;
+                                for _partition in topic.partitions_iter() {
+                                    let response_partition = FetchResponsePartition::new(0);
+                                    response.insert_partition(response_partition);
+                                }
                                 break;
                             }
                         }
                         if !found_topic {
                             let partition = FetchResponsePartition::new(100);
-                            let mut response = FetchResponse::new(topic_id);
                             response.insert_partition(partition);
-                            responses.push(response);
                         }
+                        responses.push(response);
                     }
 
                     response_version = 1;

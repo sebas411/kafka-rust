@@ -70,6 +70,9 @@ impl Topic {
     pub fn add_partition(&mut self, partition: Partition) {
         self.partitions.push(partition);
     }
+    pub fn partitions_iter(&self) -> impl Iterator<Item = &Partition> {
+        self.partitions.iter()
+    }
     pub fn get_name(&self) -> String {
         self.name.clone()
     }
