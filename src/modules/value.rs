@@ -2,6 +2,57 @@ pub trait Encode {
     fn encode(&self) -> Vec<u8>;
 }
 
+pub struct FetchResponse {
+    topic_id: [u8; 16],
+    partitions: Vec<FetchResponsePartition>,
+}
+
+impl FetchResponse {
+    pub fn new(topic_id: [u8;16]) -> Self {
+        Self { topic_id, partitions: vec![] }
+    }
+    pub fn insert_partition(&mut self, partition: FetchResponsePartition) {
+        self.partitions.push(partition);
+    }
+}
+
+impl Encode for FetchResponse {
+    fn encode(&self) -> Vec<u8> {
+        let mut response = vec![];
+        response.extend(&self.topic_id);
+        response.extend(compact_array_encode(&self.partitions));
+        response
+    }
+}
+
+pub struct FetchResponsePartition {
+    error_code: i16
+}
+
+impl FetchResponsePartition {
+    pub fn new(error_code: i16) -> Self {
+        Self { error_code }
+    }
+}
+
+impl Encode for FetchResponsePartition {
+    fn encode(&self) -> Vec<u8> {
+        let mut response = vec![];
+        response.extend(0i32.to_be_bytes()); // partition index
+        response.extend(self.error_code.to_be_bytes()); // error code
+        response.extend(0i64.to_be_bytes()); // high watermark
+        response.extend(0i64.to_be_bytes()); // last stable offset
+        response.extend(0i64.to_be_bytes()); // log start offset
+        response.push(1);
+        response.extend(0i32.to_be_bytes()); // preferred_read_replica
+        response.push(0); // records_header
+        response.push(0); // record
+        response.push(0); // tags
+        
+        response
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Topic {
     error_code: i16,
@@ -21,6 +72,9 @@ impl Topic {
     }
     pub fn get_name(&self) -> String {
         self.name.clone()
+    }
+    pub fn get_id(&self) -> [u8; 16] {
+        self.id
     }
 }
 

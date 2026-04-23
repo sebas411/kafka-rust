@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 
-use crate::{ApiVersion, modules::value::{Topic, compact_array_encode}};
+use crate::{ApiVersion, modules::value::{FetchResponse, FetchResponsePartition, Topic, compact_array_encode}};
 
 pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiVersion>, topics: Vec<Topic>) -> Result<()> {
     println!("Accepted new connection from {}", stream.peer_addr().unwrap().to_string());
@@ -29,11 +29,42 @@ pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiV
         if error_code == 0 {
             match request_api_key {
                 1  => { // Fetch
+                    let mut cursor = 12;
+
+                    let client_id_length = u16::from_be_bytes(buffer[cursor .. cursor + 2].try_into()?) as usize;
+                    let _client_id = String::from_utf8(buffer[cursor + 2 .. cursor + 2 + client_id_length].to_vec())?;
+                    cursor += 2 + client_id_length + 1; // c_id_length + c_id + empty tag buffer
+
+                    cursor += 13;
+
+                    let session_id = i32::from_be_bytes(buffer[cursor..cursor+4].try_into()?);
+                    cursor += 4 + 4; // session_id + session_epoch
+                    let topics_length = buffer[cursor] as usize - 1;
+                    cursor += 1;
+                    let mut responses = vec![];
+                    for _ in 0..topics_length {
+                        let topic_id: [u8; 16] = buffer[cursor..cursor+16].try_into()?;
+                        
+                        let mut found_topic = false;
+                        for topic in &topics {
+                            if topic.get_id() == topic_id {
+                                found_topic = true;
+                                break;
+                            }
+                        }
+                        if !found_topic {
+                            let partition = FetchResponsePartition::new(100);
+                            let mut response = FetchResponse::new(topic_id);
+                            response.insert_partition(partition);
+                            responses.push(response);
+                        }
+                    }
+
                     response_version = 1;
                     response_body.extend(0i32.to_be_bytes());
                     response_body.extend(error_code.to_be_bytes());
-                    response_body.extend(0i32.to_be_bytes());
-                    response_body.push(1);
+                    response_body.extend(session_id.to_be_bytes()); // session id
+                    response_body.extend(compact_array_encode(&responses));
                     response_body.push(0); // tag buffer
                 }
                 18 => { // ApiVersions
