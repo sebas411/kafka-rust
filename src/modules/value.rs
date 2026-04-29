@@ -1,3 +1,5 @@
+use crate::modules::parser::create_unsigned_varint;
+
 pub trait Encode {
     fn encode(&self) -> Vec<u8>;
 }
@@ -71,7 +73,7 @@ impl Record {
 impl Encode for Record {
     fn encode(&self) -> Vec<u8> {
         let mut response = vec![];
-        response.push(self.record_data.len() as u8 + 1);
+        response.extend(create_unsigned_varint(self.record_data.len() as u32 + 1));
         response.extend(&self.record_data);
         response
     }

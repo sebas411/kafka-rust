@@ -14,6 +14,18 @@ fn parse_varint(data: &[u8]) -> (i64, usize) {
     (output, cursor + 1)
 }
 
+pub fn create_unsigned_varint(mut value: u32) -> Vec<u8> {
+    let mut out = Vec::new();
+
+    while value >= 0x80 {
+        out.push(((value & 0x7F) as u8) | 0x80);
+        value >>= 7;
+    }
+
+    out.push(value as u8);
+    out
+}
+
 pub fn parse_record_file(filename_prefix: &str, topic_name: &str, partition_index: u32) -> Result<Record> {
     let filename = format!("{}/{}-{}/00000000000000000000.log", filename_prefix, topic_name, partition_index);
     let contents = fs::read(filename)?;
