@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 
-use crate::{ApiVersion, modules::{parser::{parse_record_file}, value::{FetchResponse, FetchResponsePartition, Topic, compact_array_encode}}};
+use crate::{ApiVersion, modules::{parser::parse_record_file, value::{FetchResponse, FetchResponsePartition, ProduceResponse, ProduceResponsePartition, Topic, compact_array_encode}}};
 
 pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiVersion>, topics: Vec<Topic>) -> Result<()> {
     println!("Accepted new connection from {}", stream.peer_addr().unwrap().to_string());
@@ -28,6 +28,60 @@ pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiV
     
         if error_code == 0 {
             match request_api_key {
+                0  => { // Produce
+                    let mut cursor = 12;
+
+                    let client_id_length = u16::from_be_bytes(buffer[cursor .. cursor + 2].try_into()?) as usize;
+                    let _client_id = String::from_utf8(buffer[cursor + 2 .. cursor + 2 + client_id_length].to_vec())?;
+                    cursor += 2 + client_id_length + 1; // c_id_length + c_id + empty tag buffer
+                    cursor += 7; // skip to topic array start
+                    let topics_length = buffer[cursor] as usize - 1;
+                    cursor += 1;
+                    let mut responses = vec![];
+                    for _ in 0..topics_length {
+                        let topic_name_length = buffer[cursor] as usize - 1;
+                        let topic_name = String::from_utf8(buffer[cursor + 1 .. cursor + 1 + topic_name_length].to_vec())?;
+                        cursor += 1 + topic_name_length;
+                        let mut response = ProduceResponse::new(&topic_name);
+                        let mut my_topic = None;
+                        let mut error_code = 3;
+                        for topic in &topics {
+                            if topic.get_name() == topic_name {
+                                my_topic = Some(topic.clone());
+                                break;
+                            }
+                        }
+
+                        let partition_array_length = buffer[cursor] as usize - 1;
+                        for _ in 0..partition_array_length {
+                            let partition_index = u32::from_be_bytes(buffer[cursor..cursor+4].try_into()?);
+                            cursor += 4;
+                            let record_batch_size = buffer[cursor] as usize - 1;
+                            let _record_batch = buffer[cursor + 1 .. cursor + 1 + record_batch_size].to_vec();
+
+                            if let Some(topic) = &my_topic {
+                                for partition in topic.partitions_iter() {
+                                    if partition.get_index() == partition_index {
+                                        error_code = 0;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            let response_partition = ProduceResponsePartition::new(error_code);
+                            response.insert_partition(response_partition);
+
+                            cursor += 1 + record_batch_size + 1; // tags
+                        }
+                        cursor += 1; // tag
+
+                        responses.push(response);
+                    }
+                    response_version = 1;
+                    response_body.extend(compact_array_encode(&responses));
+                    response_body.extend(0i32.to_be_bytes()); // throttle time
+                    response_body.push(0); // tag buffer
+                },
                 1  => { // Fetch
                     let mut cursor = 12;
 

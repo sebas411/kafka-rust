@@ -30,6 +30,7 @@ fn generate_api_versions() -> HashMap<i16, ApiVersion> {
     versions.insert(18, ApiVersion::new(18, 0, 4)); // ApiVersions
     versions.insert(75, ApiVersion::new(75, 0, 0)); // DescribeTopicPartitions
     versions.insert(1, ApiVersion::new(1, 0, 16)); // Fetch
+    versions.insert(0, ApiVersion::new(0, 0, 11)); // Produce
     versions
 }
 

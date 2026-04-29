@@ -4,6 +4,56 @@ pub trait Encode {
     fn encode(&self) -> Vec<u8>;
 }
 
+pub struct ProduceResponse {
+    topic_name: String,
+    partitions: Vec<ProduceResponsePartition>,
+}
+
+impl ProduceResponse {
+    pub fn new(topic_name: &str) -> Self {
+        Self { topic_name: topic_name.to_string(), partitions: Vec::new() }
+    }
+    pub fn insert_partition(&mut self, partition: ProduceResponsePartition) {
+        self.partitions.push(partition);
+    }
+}
+
+impl Encode for ProduceResponse {
+    fn encode(&self) -> Vec<u8> {
+        let mut response = vec![];
+        response.extend(self.topic_name.as_bytes()); // name
+        response.extend(compact_array_encode(&self.partitions)); // partition array
+        response.push(0); // tag_buffer
+        response
+    }
+}
+
+pub struct ProduceResponsePartition {
+    error_code: i16,
+}
+
+impl ProduceResponsePartition {
+    pub fn new(error_code: i16) -> Self {
+        Self { error_code }
+    }
+}
+
+impl Encode for ProduceResponsePartition {
+    fn encode(&self) -> Vec<u8> {
+        let mut response = vec![];
+        response.extend(0i32.to_be_bytes()); // partition id
+        response.extend(self.error_code.to_be_bytes()); // error code
+        response.extend(0i64.to_be_bytes()); // base offset
+        response.extend(0i64.to_be_bytes()); // log append time
+        response.extend(0i64.to_be_bytes()); // log start offset
+        response.push(1); // record errors array
+        response.push(0); // error message
+        response.push(0); // tag buffer
+        
+        response
+    }
+}
+
 pub struct FetchResponse {
     topic_id: [u8; 16],
     partitions: Vec<FetchResponsePartition>,
