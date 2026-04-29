@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 
-use crate::{ApiVersion, modules::value::{FetchResponse, FetchResponsePartition, Topic, compact_array_encode}};
+use crate::{ApiVersion, modules::{parser::{parse_record_file}, value::{FetchResponse, FetchResponsePartition, Topic, compact_array_encode}}};
 
 pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiVersion>, topics: Vec<Topic>) -> Result<()> {
     println!("Accepted new connection from {}", stream.peer_addr().unwrap().to_string());
@@ -50,15 +50,18 @@ pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiV
                         for topic in &topics {
                             if topic.get_id() == topic_id {
                                 found_topic = true;
-                                for _partition in topic.partitions_iter() {
-                                    let response_partition = FetchResponsePartition::new(0);
+                                let topic_name = topic.get_name();
+                                for partition in topic.partitions_iter() {
+                                    let partition_index = partition.get_index();
+                                    let record = parse_record_file("/tmp/kraft-combined-logs", &topic_name, partition_index).unwrap();
+                                    let response_partition = FetchResponsePartition::new(0, Some(record));
                                     response.insert_partition(response_partition);
                                 }
                                 break;
                             }
                         }
                         if !found_topic {
-                            let partition = FetchResponsePartition::new(100);
+                            let partition = FetchResponsePartition::new(100, None);
                             response.insert_partition(partition);
                         }
                         responses.push(response);

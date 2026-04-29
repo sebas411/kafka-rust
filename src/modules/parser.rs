@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs};
 use anyhow::Result;
-use crate::modules::value::{Partition, Topic};
+use crate::modules::value::{Partition, Record, Topic};
 
 fn parse_varint(data: &[u8]) -> (i64, usize) {
     let mut cursor = 0;
@@ -12,6 +12,13 @@ fn parse_varint(data: &[u8]) -> (i64, usize) {
         output &= current_byte;
     }
     (output, cursor + 1)
+}
+
+pub fn parse_record_file(filename_prefix: &str, topic_name: &str, partition_index: u32) -> Result<Record> {
+    let filename = format!("{}/{}-{}/00000000000000000000.log", filename_prefix, topic_name, partition_index);
+    let contents = fs::read(filename)?;
+    let record = Record::new(contents);
+    Ok(record)
 }
 
 pub fn parse_topic_file(filename: &str) -> Result<Vec<Topic>> {

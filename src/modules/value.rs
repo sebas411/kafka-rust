@@ -26,12 +26,13 @@ impl Encode for FetchResponse {
 }
 
 pub struct FetchResponsePartition {
-    error_code: i16
+    error_code: i16,
+    record: Option<Record>,
 }
 
 impl FetchResponsePartition {
-    pub fn new(error_code: i16) -> Self {
-        Self { error_code }
+    pub fn new(error_code: i16, record: Option<Record>) -> Self {
+        Self { error_code, record }
     }
 }
 
@@ -45,10 +46,33 @@ impl Encode for FetchResponsePartition {
         response.extend(0i64.to_be_bytes()); // log start offset
         response.push(1);
         response.extend(0i32.to_be_bytes()); // preferred_read_replica
-        response.push(0); // records_header
-        response.push(0); // record
+        if let Some(record) = &self.record { // records
+            response.extend(&record.encode());
+        } else {
+            response.push(0)
+        }
+        response.push(0); // tags
         response.push(0); // tags
         
+        response
+    }
+}
+
+pub struct Record {
+    record_data: Vec<u8>,
+}
+
+impl Record {
+    pub fn new(record_data: Vec<u8>) -> Self {
+        Self { record_data }
+    }
+}
+
+impl Encode for Record {
+    fn encode(&self) -> Vec<u8> {
+        let mut response = vec![];
+        response.push(self.record_data.len() as u8 + 1);
+        response.extend(&self.record_data);
         response
     }
 }
@@ -128,6 +152,9 @@ impl Encode for Partition {
 impl Partition {
     pub fn new(error_code: i16, index: u32, leader_id: u32, leader_epoch: u32, replica_nodes: Vec<u32>, isr_nodes: Vec<u32>, eligible_leader_replicas: Vec<u32>, last_known_elr: Vec<u32>, offline_replicas: Vec<u32>) -> Self {
         Self { error_code, index, leader_id, leader_epoch, replica_nodes, isr_nodes, eligible_leader_replicas, last_known_elr, offline_replicas }
+    }
+    pub fn get_index(&self) -> u32 {
+        self.index
     }
 }
 
