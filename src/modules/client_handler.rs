@@ -53,6 +53,7 @@ pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiV
                         }
 
                         let partition_array_length = buffer[cursor] as usize - 1;
+                        cursor += 1;
                         for _ in 0..partition_array_length {
                             let partition_index = u32::from_be_bytes(buffer[cursor..cursor+4].try_into()?);
                             cursor += 4;
@@ -68,7 +69,7 @@ pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiV
                                 }
                             }
 
-                            let response_partition = ProduceResponsePartition::new(error_code);
+                            let response_partition = ProduceResponsePartition::new(error_code, partition_index);
                             response.insert_partition(response_partition);
 
                             cursor += 1 + record_batch_size + 1; // tags
