@@ -47,7 +47,7 @@ impl Encode for ProduceResponsePartition {
         response.extend(self.error_code.to_be_bytes()); // error code
         if self.error_code == 0 {
             response.extend(0i64.to_be_bytes()); // base offset
-            response.extend(0i64.to_be_bytes()); // log append time
+            response.extend((-1i64).to_be_bytes()); // log append time
             response.extend(0i64.to_be_bytes()); // log start offset
         } else {
             response.extend((-1i64).to_be_bytes()); // base offset
