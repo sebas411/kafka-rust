@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fs};
 use anyhow::Result;
 use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 
@@ -58,12 +58,13 @@ pub async fn handle_client(mut stream: TcpStream, apiversions: HashMap<i16, ApiV
                             let partition_index = u32::from_be_bytes(buffer[cursor..cursor+4].try_into()?);
                             cursor += 4;
                             let record_batch_size = buffer[cursor] as usize - 1;
-                            let _record_batch = buffer[cursor + 1 .. cursor + 1 + record_batch_size].to_vec();
+                            let record_batch = buffer[cursor + 1 .. cursor + 1 + record_batch_size].to_vec();
 
                             if let Some(topic) = &my_topic {
                                 for partition in topic.partitions_iter() {
                                     if partition.get_index() == partition_index {
                                         error_code = 0;
+                                        fs::write(&format!("/tmp/kraft-combined-logs/{}-{}/00000000000000000000.log", topic_name, partition_index), record_batch)?;
                                         break;
                                     }
                                 }
